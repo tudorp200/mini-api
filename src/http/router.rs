@@ -60,19 +60,35 @@ impl Router {
 
     fn handle_client(&self, mut stream: TcpStream){
         let mut buffer = [0; 1024];
-        stream.read(&mut buffer).unwrap();
+        loop {
+            let bytes_read = match stream.read(&mut buffer) {
+                Ok(0) => break, 
+                Ok(n) => n,
+                Err(_) => break,
+            };
 
-        let request_text = String::from_utf8_lossy(&buffer);
+            let request_text = String::from_utf8_lossy(&buffer[..bytes_read]);
 
-        let req = Request::parse_request(&request_text).unwrap();
+            let req = match Request::parse_request(&request_text) {
+                Ok(parsed_req) => parsed_req,
+                Err(e) => {
+                    let error_response = Response::new(400, "Bad Request", "Malformed HTTP request");
+                    let _ = stream.write_all(error_response.to_http_string().as_bytes());
+                    break;
+                }
+            };
+            
+            let route_key = format!("{} {}", req.method, req.path);
 
-        let route_key = format!("{} {}", req.method, req.path);
+            let response = match self.routes.get(&route_key) {
+                Some(handler) => handler(req),
+                _ => Response::new(404, "Not found", "Page not found")
+            };
 
-        let response = match self.routes.get(&route_key) {
-            Some(handler) => handler(req),
-            _ => Response::new(404, "Not found", "Page not found")
-        };
-
-        stream.write_all(response.to_http_string().as_bytes()).unwrap();
+            if stream.write_all(response.to_http_string().as_bytes()).is_err() {
+                break;
+            }
+        }
+        
     }
 }

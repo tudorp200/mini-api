@@ -5,7 +5,6 @@ use http::request::Request;
 use http::response::Response;
 use http::router::Router;
 
-
 fn main() {
 
     let mut app = Router::new();
