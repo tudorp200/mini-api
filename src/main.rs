@@ -1,4 +1,5 @@
-mod http;
+pub mod concurrency; 
+pub mod http;
 
 use http::request::Request;
 use http::response::Response;

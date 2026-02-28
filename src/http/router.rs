@@ -1,7 +1,10 @@
+
+use crate::concurrency::thread_pool::ThreadPool; 
 use crate::http::{request::Request, response::Response};
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
+use std::sync::Arc;
 
 type Handler = fn(Request) -> Response;
 
@@ -38,14 +41,24 @@ impl Router {
         self.routes.insert(format!("DELETE {}", path), handler);
     }
 
-    pub fn listen(&self, address: &str) {
+    pub fn listen(self, address: &str) {
         let listener = TcpListener::bind(address).unwrap();
-        for mut stream in listener.incoming().flatten() {
-            self.handle_client(&mut stream);
+        let pool = ThreadPool::new(6);
+
+        let shared_router = Arc::new(self);
+
+        for stream in listener.incoming().flatten() {
+            
+            let router_clone = Arc::clone(&shared_router);
+            pool.execute(move || {
+                router_clone.handle_client(stream);
+                Ok(()) 
+                
+            }).unwrap();
         }
     }
 
-    fn handle_client(&self, stream: &mut TcpStream){
+    fn handle_client(&self, mut stream: TcpStream){
         let mut buffer = [0; 1024];
         stream.read(&mut buffer).unwrap();
 
