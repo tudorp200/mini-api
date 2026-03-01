@@ -11,6 +11,15 @@ pub struct BaseRepository<T: Model> {
     _marker: PhantomData<T>, 
 }
 
+impl<T: Model> BaseRepository<T> {
+    pub fn new(pool: Pool<PostgresConnectionManager<NoTls>>) -> Self {
+        Self {
+            pool,
+            _marker: PhantomData,
+        }
+    }
+}
+
 impl<T: Model> Repository for BaseRepository<T> {
     type Item = T;
 
@@ -34,27 +43,31 @@ impl<T: Model> Repository for BaseRepository<T> {
         Ok(())
     }
 
-    pub fn find_by_id(&self, id: i32) -> Option<T> {
-        let mut conn = self.pool.get().expect("Failed to get DB connection");
+    fn find_by_id(&self, id: i32) -> Result<T, DbError> {
+    
+        let mut conn = self.pool.get().map_err(|e| e.to_string())?;
         
         let query = format!("SELECT * FROM {} WHERE id = $1", T::table_name());
         
-        let row_opt = conn.query_opt(&query, &[&id]).ok()?; 
+        let row_opt = conn.query_opt(&query, &[&id]).map_err(|e| e.to_string())?; 
 
-        row_opt.map(|row| T::from_row(&row))
+        match row_opt {
+            Some(row) => Ok(T::from_row(&row)),
+            None => Err(format!("Record with id {} not found in {}", id, T::table_name())),
+        }
     }
 
-    pub fn find_all(&self) -> Vec<T> {
-        let mut conn = self.pool.get().expect("Failed to get DB connection");
+    fn find_all(&self) -> Result<Vec<T>, DbError> {
+        let mut conn = self.pool.get().map_err(|e| e.to_string())?;
         
         let query = format!("SELECT * FROM {}", T::table_name());
         
-        let rows = conn.query(&query, &[]).unwrap_or_default();
+        let rows = conn.query(&query, &[]).map_err(|e| e.to_string())?;
         
-        rows.iter().map(|row| T::from_row(row)).collect()
+        Ok(rows.iter().map(|row| T::from_row(row)).collect())
     }
 
-    pub fn delete(&self, id: i32) -> Result<(), String> {
+    fn delete(&self, id: i32) -> Result<(), String> {
         let mut conn = self.pool.get().expect("Failed to get DB connection");
         
         let query = format!("DELETE FROM {} WHERE id = $1", T::table_name());

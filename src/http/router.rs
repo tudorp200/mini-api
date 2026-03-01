@@ -6,8 +6,7 @@ use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::Arc;
 
-type Handler = fn(Request) -> Response;
-
+type Handler = std::sync::Arc<dyn Fn(Request) -> Response + Send + Sync>;
 // METHOD + PATH : Actual implemented method
 pub struct Router {
     pub routes: Vec<(String, String, Handler)>,
@@ -20,24 +19,39 @@ impl Router {
         }
     }
 
-    pub fn get(&mut self, path: &str, handler: Handler) {
-        self.routes.push(("GET".to_string(), path.to_string(), handler));
+    pub fn get<F>(&mut self, path: &str, handler: F)
+    where
+        F: Fn(Request) -> Response + Send + Sync + 'static, 
+    {
+        self.routes.push(("GET".to_string(), path.to_string(), std::sync::Arc::new(handler)));
     }
 
-    pub fn post(&mut self, path: &str, handler: Handler) {
-        self.routes.push(("POST".to_string(), path.to_string(), handler));
+    pub fn post<F>(&mut self, path: &str, handler: F) 
+    where
+        F: Fn(Request) -> Response + Send + Sync + 'static,
+    {
+        self.routes.push(("POST".to_string(), path.to_string(), std::sync::Arc::new(handler)));
     }
 
-    pub fn put(&mut self, path: &str, handler: Handler) {
-        self.routes.push(("PUT".to_string(), path.to_string(), handler));
+    pub fn put<F>(&mut self, path: &str, handler: F)
+    where
+        F: Fn(Request) -> Response + Send + Sync + 'static,
+    {
+        self.routes.push(("PUT".to_string(), path.to_string(), std::sync::Arc::new(handler)));
     }
 
-    pub fn patch(&mut self, path: &str, handler: Handler) {
-        self.routes.push(("PATCH".to_string(), path.to_string(), handler));
+    pub fn patch<F>(&mut self, path: &str, handler: F)
+    where
+        F: Fn(Request) -> Response + Send + Sync + 'static,
+    {
+        self.routes.push(("PATCH".to_string(), path.to_string(), std::sync::Arc::new(handler)));
     }
 
-    pub fn delete(&mut self, path: &str, handler: Handler) {
-        self.routes.push(("DELETE".to_string(), path.to_string(), handler));
+    pub fn delete<F>(&mut self, path: &str, handler: F)
+    where
+        F: Fn(Request) -> Response + Send + Sync + 'static,
+    {
+        self.routes.push(("DELETE".to_string(), path.to_string(), std::sync::Arc::new(handler)));
     }
 
     pub fn listen(self, address: &str) {

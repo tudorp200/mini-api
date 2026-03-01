@@ -1,27 +1,26 @@
-use crate::traits::Model;
 use postgres::{Row, types::ToSql};
-#[derive(serde::Serialize, serde::Deserialize)]
-pub struct ProductModel {
+use serde::{Serialize, Deserialize};
+use crate::traits::Model;
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Product {
     pub id: i32,
-    pub price: f32, 
-    pub stock: i32,
-    // foreign key
-    pub category_id: i32, 
+    pub category_id: i32,
     pub name: String,
+    pub price: f32,
+    pub stock: i32,
 }
 
-impl Model for ProductModel {
-    fn table_name() -> &'static str {
-        "products"
-    }
-    
-    fn from_row(row : &Row) -> Self {
+impl Model for Product {
+    fn table_name() -> &'static str { "products" }
+
+    fn from_row(row: &Row) -> Self {
         Self {
-            id : row.get("id"),
-            price : row.get("price"),
-            name : row.get("name"),
-            stock : row.get("stock"),
-            category_id : row.get("category_id")
+            id: row.get("id"),
+            category_id: row.get("category_id"),
+            name: row.get("name"),
+            price: row.get("price"),
+            stock: row.get("stock"),
         }
     }
 
@@ -30,7 +29,6 @@ impl Model for ProductModel {
     }
 
     fn insert_params(&self) -> Vec<&(dyn ToSql + Sync)> {
-        // Just return a vector referencing your struct's fields in the exact order of the $1, $2 variables!
         vec![&self.category_id, &self.name, &self.price, &self.stock]
     }
 
