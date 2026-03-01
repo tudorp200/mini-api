@@ -5,4 +5,7 @@ edition = "2024"
 
 [dependencies]
 crossbeam = "0.8"
-serde = "1.0"
+r2d2 = "0.8.10"
+r2d2_sqlite = "0.32.0"
+rusqlite = { version = "0.38.0", features = ["bundled"] }
+serde = { version = "1.0", features = ["derive"] }

@@ -6,6 +6,8 @@ pub struct Request {
     pub path: String,
     pub headers : HashMap<String, String>,
     pub body: String,
+    pub path_params: HashMap<String, String>,
+    pub query_params: HashMap<String, String>,
 }
 
 impl Request {
@@ -15,6 +17,8 @@ impl Request {
             path: path.to_string(),
             headers: HashMap::new(),
             body: body.to_string(),
+            path_params : HashMap::new(),
+            query_params : HashMap::new()
         }
     }
 
@@ -23,13 +27,27 @@ impl Request {
     //
     pub fn parse_request(raw_http_request: &str) -> Result<Request, &str> {
         if let Some((header_part, body_part)) = raw_http_request.split_once("\r\n\r\n") {
-            let (headers, method, path) = Self::parse_header(header_part)?;
+            let (headers, method, full_path) = Self::parse_header(header_part)?;
+            
+            let mut path = full_path.to_string();
+            let mut query_params = HashMap::new();
+            
+            if let Some((base_path, query_str)) = full_path.split_once('?') {
+                path = base_path.to_string();
+                for pair in query_str.split('&') {
+                    if let Some((key, value)) = pair.split_once('=') {
+                        query_params.insert(key.to_string(), value.to_string());
+                    }
+                }
+            }
 
             Ok(Request {
                 method: method.to_string(),
-                path: path.to_string(),
+                path,
                 headers,
                 body: body_part.to_string(),
+                path_params : HashMap::new(), // will populated by the router
+                query_params,
             })
         } else{ 
             return Err("Missing double CRLF")

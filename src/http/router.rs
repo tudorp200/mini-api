@@ -10,35 +10,34 @@ type Handler = fn(Request) -> Response;
 
 // METHOD + PATH : Actual implemented method
 pub struct Router {
-    pub routes: HashMap<String, Handler>,
+    pub routes: Vec<(String, String, Handler)>,
 }
 
 impl Router {
     pub fn new() -> Self {
         Router {
-            routes: HashMap::new(),
+            routes: Vec::new(),
         }
     }
 
     pub fn get(&mut self, path: &str, handler: Handler) {
-        print!("get");
-        self.routes.insert(format!("GET {}", path), handler);
+        self.routes.push(("GET".to_string(), path.to_string(), handler));
     }
 
     pub fn post(&mut self, path: &str, handler: Handler) {
-        self.routes.insert(format!("POST {}", path), handler);
+        self.routes.push(("POST".to_string(), path.to_string(), handler));
     }
 
     pub fn put(&mut self, path: &str, handler: Handler) {
-        self.routes.insert(format!("PUT {}", path), handler);
+        self.routes.push(("PUT".to_string(), path.to_string(), handler));
     }
-    
-    pub fn patch(&mut self, path: &str, handler: Handler) {print!("client connected");
-        self.routes.insert(format!("PATCH {}", path), handler);
+
+    pub fn patch(&mut self, path: &str, handler: Handler) {
+        self.routes.push(("PATCH".to_string(), path.to_string(), handler));
     }
 
     pub fn delete(&mut self, path: &str, handler: Handler) {
-        self.routes.insert(format!("DELETE {}", path), handler);
+        self.routes.push(("DELETE".to_string(), path.to_string(), handler));
     }
 
     pub fn listen(self, address: &str) {
@@ -58,6 +57,25 @@ impl Router {
         }
     }
 
+    fn match_route(template: &str, path: &str) -> Option<HashMap<String, String>> {
+        let template_parts: Vec<&str> = template.split('/').filter(|s| !s.is_empty()).collect();
+        let path_parts: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+
+        if template_parts.len() != path_parts.len() {
+            return None;
+        }
+
+        let mut params = HashMap::new();
+        for (t, p) in template_parts.iter().zip(path_parts.iter()) {
+            if t.starts_with(':') {
+                params.insert(t[1..].to_string(), p.to_string());
+            } else if t != p {
+                return None;
+            }
+        }
+        Some(params)
+    }
+
     fn handle_client(&self, mut stream: TcpStream){
         let mut buffer = [0; 1024];
         loop {
@@ -69,7 +87,7 @@ impl Router {
 
             let request_text = String::from_utf8_lossy(&buffer[..bytes_read]);
 
-            let req = match Request::parse_request(&request_text) {
+            let mut req = match Request::parse_request(&request_text) {
                 Ok(parsed_req) => parsed_req,
                 Err(e) => {
                     let error_response = Response::new(400, "Bad Request", "Malformed HTTP request");
@@ -78,17 +96,20 @@ impl Router {
                 }
             };
             
-            let route_key = format!("{} {}", req.method, req.path);
+            let mut response = Response::new(404, "Not Found", "Page not found");
 
-            let response = match self.routes.get(&route_key) {
-                Some(handler) => handler(req),
-                _ => Response::new(404, "Not found", "Page not found")
-            };
-
+            for (route_method, route_path, handler) in &self.routes {
+                if req.method == *route_method {
+                    if let Some(params) = Self::match_route(route_path, &req.path) {
+                        req.path_params = params;
+                        response = handler(req);
+                        break;
+                    }
+                }
+            }
             if stream.write_all(response.to_http_string().as_bytes()).is_err() {
                 break;
             }
         }
-        
     }
 }
