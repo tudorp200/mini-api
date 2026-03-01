@@ -79,7 +79,7 @@ impl<T: Model + 'static> BaseController<T> {
         if let Some(id_str) = req.path_params.get("id") {
             if let Ok(id) = id_str.parse::<i32>() {
                 match self.repo.delete(id) {
-                    Ok(_) => Response::new(204, "No Content", ""), // 204 means success, no body
+                    Ok(_) => Response::new(204, "No Content", ""),
                     Err(e) => Response::new(500, "Internal Server Error", &e),
                 }
             } else {

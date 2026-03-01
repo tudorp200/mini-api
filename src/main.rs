@@ -15,6 +15,8 @@ use models::basket::Basket;
 use models::order::Order;
 
 use controllers::base_controller::BaseController;
+use controllers::product_controller::ProductController;
+use controllers::category_controller::CategoryController;
 
 use http::router::Router;
 use repositories::base_repository::BaseRepository;
@@ -35,29 +37,40 @@ fn main() {
     // ==========================================
     // PRODUCTS API
     // ==========================================
+    
     let product_repo = Arc::new(BaseRepository::<Product>::new(pool.clone()));
-    let product_controller = Arc::new(BaseController::<Product>::new(product_repo));
 
-    let pc = Arc::clone(&product_controller);
-    app.get("/products", move |req| pc.get_all(req));
+    let base_prod_ctrl = Arc::new(BaseController::<Product>::new(Arc::clone(&product_repo)));
+    let custom_prod_ctrl = Arc::new(ProductController::new(Arc::clone(&product_repo)));
 
-    let pc = Arc::clone(&product_controller);
+    let pc = Arc::clone(&custom_prod_ctrl);
+    app.get("/products", move |req| pc.get_paginated(req));
+
+    let pc = Arc::clone(&base_prod_ctrl);
     app.get("/products/:id", move |req| pc.get_by_id(req));
 
-    let pc = Arc::clone(&product_controller);
+    let pc = Arc::clone(&base_prod_ctrl);
     app.post("/products", move |req| pc.create(req));
 
-    let pc = Arc::clone(&product_controller);
+    let pc = Arc::clone(&base_prod_ctrl);
     app.put("/products/:id", move |req| pc.update(req));
 
-    let pc = Arc::clone(&product_controller);
+    let pc = Arc::clone(&base_prod_ctrl);
     app.delete("/products/:id", move |req| pc.delete(req));
+
+    let pc = Arc::clone(&base_prod_ctrl);
+    app.get("/products/:id", move |req| pc.get_by_id(req));
 
     // ==========================================
     // CATEGORY API
     // ==========================================
 
     let category_repo = Arc::new(BaseRepository::<Category>::new(pool.clone()));
+
+    let custom_category_ctrl = Arc::new(CategoryController::new(Arc::clone(&product_repo)));
+    let cc = Arc::clone(&custom_category_ctrl);
+    app.get("/categories/:id/products", move |req| cc.get_products(req));
+
     let category_controller = Arc::new(BaseController::<Category>::new(category_repo));
 
     let pc = Arc::clone(&category_controller);
@@ -121,4 +134,5 @@ fn main() {
 
     app.listen("127.0.0.1:4221");
 }
+
 
