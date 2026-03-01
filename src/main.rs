@@ -1,9 +1,11 @@
 pub mod concurrency; 
 pub mod http;
+pub mod traits;
 
 use http::request::Request;
 use http::response::Response;
 use http::router::Router;
+
 
 fn main() {
 
