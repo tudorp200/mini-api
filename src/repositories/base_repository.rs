@@ -39,7 +39,12 @@ impl<T: Model> Repository for BaseRepository<T> {
         let query = T::update_query();
         let params = item.update_params();
         
-        conn.execute(query, &params[..]).map_err(|e| e.to_string())?;
+        let rows_affected = conn.execute(query, &params[..]).map_err(|e| e.to_string())?;
+        
+        if rows_affected == 0 {
+            
+            return Err("Not Found".to_string());
+        }
         Ok(())
     }
 

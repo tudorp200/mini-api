@@ -10,12 +10,17 @@ use r2d2_postgres::{postgres::NoTls, PostgresConnectionManager};
 use std::sync::Arc;
 
 use models::product::Product;
-use controllers::product_controller::ProductController;
+use models::category::Category;
+use models::basket::Basket;
+use models::order::Order;
+
+use controllers::base_controller::BaseController;
 
 use http::router::Router;
 use repositories::base_repository::BaseRepository;
 
 fn main() {
+    let mut app = Router::new();
 
     let manager = PostgresConnectionManager::new(
         "postgres://admin:admin@localhost:5432/db".parse().unwrap(),
@@ -27,19 +32,92 @@ fn main() {
         .build(manager)
         .expect("Failed to create Postgres connection pool");
 
-    let product_repo = Arc::new(BaseRepository::<Product>::new(pool));
-    let product_controller = Arc::new(ProductController::new(product_repo));
+    // ==========================================
+    // PRODUCTS API
+    // ==========================================
+    let product_repo = Arc::new(BaseRepository::<Product>::new(pool.clone()));
+    let product_controller = Arc::new(BaseController::<Product>::new(product_repo));
 
-    let mut app = Router::new();
+    let pc = Arc::clone(&product_controller);
+    app.get("/products", move |req| pc.get_all(req));
 
-    let pc_get_all = Arc::clone(&product_controller);
-    app.get("/products", move |req| pc_get_all.get_all(req));
+    let pc = Arc::clone(&product_controller);
+    app.get("/products/:id", move |req| pc.get_by_id(req));
 
-    let pc_get_id = Arc::clone(&product_controller);
-    app.get("/products/:id", move |req| pc_get_id.get_by_id(req));
+    let pc = Arc::clone(&product_controller);
+    app.post("/products", move |req| pc.create(req));
 
-    let pc_create = Arc::clone(&product_controller);
-    app.post("/products", move |req| pc_create.create(req));
+    let pc = Arc::clone(&product_controller);
+    app.put("/products/:id", move |req| pc.update(req));
+
+    let pc = Arc::clone(&product_controller);
+    app.delete("/products/:id", move |req| pc.delete(req));
+
+    // ==========================================
+    // CATEGORY API
+    // ==========================================
+
+    let category_repo = Arc::new(BaseRepository::<Category>::new(pool.clone()));
+    let category_controller = Arc::new(BaseController::<Category>::new(category_repo));
+
+    let pc = Arc::clone(&category_controller);
+    app.get("/categories", move |req| pc.get_all(req));
+
+    let pc = Arc::clone(&category_controller);
+    app.get("/categories/:id", move |req| pc.get_by_id(req));
+
+    let pc = Arc::clone(&category_controller);
+    app.post("/categories", move |req| pc.create(req));
+
+    let pc = Arc::clone(&category_controller);
+    app.put("/categories/:id", move |req| pc.update(req));
+
+    let pc = Arc::clone(&category_controller);
+    app.delete("/categories/:id", move |req| pc.delete(req));
+
+    // ==========================================
+    // BASKET API
+    // ==========================================
+
+    let basket_repo = Arc::new(BaseRepository::<Basket>::new(pool.clone()));
+    let basket_controller = Arc::new(BaseController::<Basket>::new(basket_repo));
+
+    let pc = Arc::clone(&basket_controller);
+    app.get("/baskets", move |req| pc.get_all(req));
+
+    let pc = Arc::clone(&basket_controller);
+    app.get("/baskets/:id", move |req| pc.get_by_id(req));
+
+    let pc = Arc::clone(&basket_controller);
+    app.post("/baskets", move |req| pc.create(req));
+
+    let pc = Arc::clone(&basket_controller);
+    app.put("/baskets/:id", move |req| pc.update(req));
+
+    let pc = Arc::clone(&basket_controller);
+    app.delete("/baskets/:id", move |req| pc.delete(req));
+
+    // ==========================================
+    // ORDER API
+    // ==========================================
+
+    let order_repo = Arc::new(BaseRepository::<Order>::new(pool.clone()));
+    let order_controller = Arc::new(BaseController::<Order>::new(order_repo));
+
+    let pc = Arc::clone(&order_controller);
+    app.get("/orders", move |req| pc.get_all(req));
+
+    let pc = Arc::clone(&order_controller);
+    app.get("/orders/:id", move |req| pc.get_by_id(req));
+
+    let pc = Arc::clone(&order_controller);
+    app.post("/orders", move |req| pc.create(req));
+
+    let pc = Arc::clone(&order_controller);
+    app.put("/orders/:id", move |req| pc.update(req));
+
+    let pc = Arc::clone(&order_controller);
+    app.delete("/orders/:id", move |req| pc.delete(req));
 
     app.listen("127.0.0.1:4221");
 }

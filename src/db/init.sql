@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS categories (
 
 CREATE TABLE IF NOT EXISTS products (
     id SERIAL PRIMARY KEY,
-    category_id INTEGER NOT NULL REFERENCES categories(id),
+    category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     price REAL NOT NULL,
     stock INTEGER NOT NULL
@@ -22,8 +22,8 @@ CREATE TABLE IF NOT EXISTS baskets (
 
 
 CREATE TABLE IF NOT EXISTS basket_items (
-    basket_id INTEGER NOT NULL REFERENCES baskets(id),
-    product_id INTEGER NOT NULL REFERENCES products(id),
+   basket_id INTEGER NOT NULL REFERENCES baskets(id) ON DELETE CASCADE,
+    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     quantity INTEGER NOT NULL,
     PRIMARY KEY (basket_id, product_id)
 );
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS basket_items (
 
 CREATE TABLE IF NOT EXISTS orders (
     id SERIAL PRIMARY KEY,
-    basket_id INTEGER NOT NULL REFERENCES baskets(id),
+    basket_id INTEGER NOT NULL REFERENCES baskets(id) ON DELETE CASCADE,
     total_paid REAL NOT NULL,
     status VARCHAR(50) NOT NULL 
 );

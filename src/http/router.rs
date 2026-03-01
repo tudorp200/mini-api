@@ -103,7 +103,7 @@ impl Router {
 
             let mut req = match Request::parse_request(&request_text) {
                 Ok(parsed_req) => parsed_req,
-                Err(e) => {
+                Err(_) => {
                     let error_response = Response::new(400, "Bad Request", "Malformed HTTP request");
                     let _ = stream.write_all(error_response.to_http_string().as_bytes());
                     break;
