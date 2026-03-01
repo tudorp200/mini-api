@@ -1,22 +1,21 @@
 use crate::traits::Model;
 use postgres::{Row, types::ToSql};
 #[derive(serde::Serialize, serde::Deserialize)]
-pub struct CategoryModel {
-    // primary key
-    pub id: i32, 
-    pub name: String,
+pub struct BasketModel {
+    pub id: i32,
+    pub status : String,
 }
 
-impl Model for CategoryModel {
+impl Model for BasketModel {
     
     fn table_name() -> &'static str {
-        "categories"
+        return "baskets";
     }
     
     fn from_row(row : &Row) -> Self {
         Self {
             id : row.get("id"),
-            name : row.get("name")
+            status : row.get("status")
         }
     }
 
