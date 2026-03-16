@@ -37,6 +37,7 @@ impl OrderController {
 
     // POST /orders
     pub fn checkout(&self, req: Request) -> Response {
+        println!("Received checkout request for order: {:?}", req.body);
         let body: serde_json::Value = serde_json::from_str(&req.body).unwrap_or_default();
         let basket_id = body["basket_id"].as_i64().unwrap_or(0) as i32;
 

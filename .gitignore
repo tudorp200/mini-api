@@ -1,2 +1,6 @@
+*.md
 /target
 Cargo.lock
+.env 
+venv
+requirements.txt

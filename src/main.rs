@@ -118,7 +118,7 @@ fn define_order_api(
     app: &mut Router,
 ) {
     let coc = Arc::clone(&custom_order_ctrl);
-    app.post("/orders", move |req| coc.checkout(req));
+    app.post("/orders/checkout", move |req| coc.checkout(req));
 
     let pc = Arc::clone(&order_controller);
     app.get("/orders", move |req| pc.get_all(req));
