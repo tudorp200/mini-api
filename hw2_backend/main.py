@@ -4,6 +4,7 @@ from typing import Dict
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import json
@@ -24,6 +25,14 @@ app = FastAPI(
     title="HW2 E-Commerce Aggregator", 
     description="Aggregating HW1 E-commerce with External APIs",
     lifespan=lifespan
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -80,29 +89,60 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 async def fetch_hw1(path: str, method: str = "GET", json_data: dict = None):
     try:
-        url = f"{HW1_API_URL}{path}"
-        print(f"Calling HW1: {url}")
+        url_path = path
+        full_url = f"{HW1_API_URL}{path}"
         
-        if method == "GET":
-            resp = await client.get(url)
-        else: 
-
-            payload_str = json.dumps(json_data) + "\r\n"
-            headers = {
-                "Content-Type": "application/json",
-                "Content-Length": str(len(payload_str))
-            }
-            resp = await client.post(url, content=payload_str, headers=headers)
+        headers_str = "Host: 127.0.0.1:4221\r\nConnection: close\r\n"
+        payload_str = ""
         
-        if resp.status_code >= 400:
-            raise HTTPException(status_code=resp.status_code, detail=f"HW1 Error: {resp.text}")
+        if json_data:
+            payload_str = json.dumps(json_data)
+            headers_str += f"Content-Type: application/json\r\nContent-Length: {len(payload_str)}\r\n"
 
-        if not resp.text.strip():
-            return {"message": "Success"}
+        http_request = (
+            f"{method} {url_path} HTTP/1.1\r\n"
+            f"{headers_str}\r\n"
+            f"{payload_str}"
+        )
+        
+        print(f"Sending raw TCP request to Rust (HW1): {method} {url_path}")
+        # print(f"Full request:\n{http_request}")
+        
+        reader, writer = await asyncio.open_connection('127.0.0.1', 4221)
+        writer.write(http_request.encode('utf-8'))
+        await writer.drain()
+        
+        response_data = await reader.read(8192) # Read up to 8KB response
+        writer.close()
+        await writer.wait_closed()
+        
+        raw_response = response_data.decode('utf-8')
+        # print(f"Raw HW1 Response:\n{raw_response}")
+
+        # Parse HTTP response
+        if "\r\n\r\n" not in raw_response:
+            raise HTTPException(status_code=500, detail=f"HW1 Malformed Response: {raw_response}")
             
-        return resp.json()
-    except httpx.RequestError as e:
+        header_part, body_part = raw_response.split("\r\n\r\n", 1)
+        status_line = header_part.splitlines()[0]
+        
+        if len(status_line.split()) < 3:
+             raise HTTPException(status_code=500, detail=f"HW1 Malformed Status Line: {status_line}")
+
+        status_code = int(status_line.split()[1])
+
+        if status_code >= 400:
+            raise HTTPException(status_code=status_code, detail=f"HW1 Error: {body_part.strip()}")
+
+        if not body_part.strip():
+            return {"message": "Success", "status_code": status_code}
+            
+        return json.loads(body_part)
+    except (httpx.RequestError, ConnectionRefusedError) as e:
         raise HTTPException(status_code=503, detail=f"HW1 unavailable: {str(e)}")
+    except json.JSONDecodeError:
+        print(f"Failed to decode JSON from HW1 body: {body_part}")
+        return {"message": "Success", "status_code": status_code, "raw_body": body_part}
 
 import asyncio
 import json
@@ -186,8 +226,39 @@ async def list_products(currency: str = "USD"):
         p["currency"] = currency.upper()
     return products
 
+@app.post("/api/v1/baskets")
+async def create_basket():
+    # Rust expects a POST to /baskets with id and status
+    await fetch_hw1("/baskets", method="POST", json_data={"id": 0, "status": "active"})
+    # Since HW1 doesn't return the ID, we fetch all and take the latest one
+    baskets = await fetch_hw1("/baskets")
+    if not baskets:
+        raise HTTPException(status_code=500, detail="Failed to retrieve created basket")
+    # Return the one with highest ID
+    latest = max(baskets, key=lambda b: b['id'])
+    return latest
+
+@app.get("/api/v1/baskets/{basket_id}/items")
+async def list_basket_items(basket_id: int):
+    return await fetch_hw1(f"/baskets/{basket_id}/items")
+
+@app.post("/api/v1/baskets/{basket_id}/items")
+async def add_basket_item(basket_id: int, item: BasketItem):
+    return await fetch_hw1(f"/baskets/{basket_id}/items", method="POST", json_data=item.model_dump())
+
+@app.put("/api/v1/baskets/{basket_id}/items/{product_id}")
+async def update_basket_item(basket_id: int, product_id: int, item: BasketItem):
+    # Ensure item matches path parameters
+    item.basket_id = basket_id
+    item.product_id = product_id
+    return await fetch_hw1(f"/baskets/{basket_id}/items/{product_id}", method="PUT", json_data=item.model_dump())
+
+@app.delete("/api/v1/baskets/{basket_id}/items/{product_id}")
+async def delete_basket_item(basket_id: int, product_id: int):
+    return await fetch_hw1(f"/baskets/{basket_id}/items/{product_id}", method="DELETE")
+
 @app.post("/api/v1/shipping/quote")
-async def get_shipping_quote(req: ShippingRequest):
+async def get_shipping_quote(req: ShippingRequest, currency: str = "USD"):
     items_data = await fetch_hw1(f"/baskets/{req.basket_id}/items")
     items = [BasketItem(**i) for i in items_data]
     
@@ -225,8 +296,16 @@ async def get_shipping_quote(req: ShippingRequest):
         
         rates = resp.json().get("rates", [])
         print(f"Received {len(rates)} shipping rates from Shippo.")
+
+        conversion_rate = await get_conversion_rate(currency)
+
         filtered_rates = [
-            {"provider": r.get("provider", "N/A"), "servicelevel": r.get("servicelevel_name", "N/A"), "amount": r.get("amount", "N/A"), "currency": r.get("currency", "N/A"), "duration": r.get("estimated_days", "N/A"), "rate_id": r.get("object_id", "N/A")}
+            {"provider": r.get("provider", "N/A"), 
+             "servicelevel": r.get("servicelevel_name", "N/A"), 
+             "amount": round(float(r.get("amount", 0)) * conversion_rate, 2), # Convert amount
+             "currency": currency.upper(), # Set currency to target
+             "duration": r.get("estimated_days", "N/A"), 
+             "rate_id": r.get("object_id", "N/A")}
             for r in rates if r.get("amount") and r.get("provider")
         ]
         return {"basket_id": req.basket_id, "total_weight": total_weight, "rates": filtered_rates[:5]}

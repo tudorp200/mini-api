@@ -1,6 +1,13 @@
-*.md
 /target
 Cargo.lock
-.env 
+.env
 venv
-requirements.txt
+
+# Frontend ignores
+hw2_frontend/node_modules/
+hw2_frontend/build/
+
+# Backend specific ignores (already present)
+hw2_backend/venv/
+hw2_backend/.env
+hw2_backend/requirements.txt
